@@ -550,11 +550,20 @@ themeBtn.addEventListener('click',()=>{
 });
 
 // ── TYPING ─────────────────────────────────────────────────────
-const roles=['Software','Web','Full Stack','App','Game'];
+const roles=[
+  {a:'Software', b:'Developer.'},
+  {a:'Web', b:'Developer.'},
+  {a:'Full Stack', b:'Developer.'},
+  {a:'Data', b:'Analyst.'},
+  {a:'DevOps', b:'Engineer.'},
+  {a:'AI/ML', b:'Engineer.'}
+];
 let ri=0,ci=0,del=false;
 const te=document.getElementById('typed');
+const te2=document.querySelector('.hero-title .l2');
 function tick(){
-  const w=roles[ri];
+  const w=roles[ri].a;
+  if(ci===0 && !del){ te2.textContent=roles[ri].b; }
   if(!del){te.textContent=w.slice(0,++ci);if(ci===w.length){setTimeout(()=>{del=true;tick();},1800);return;}}
   else{te.textContent=w.slice(0,--ci);if(ci===0){del=false;ri=(ri+1)%roles.length;}}
   setTimeout(tick,del?55:105);
