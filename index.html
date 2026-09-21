@@ -163,6 +163,20 @@ section{min-height:100vh;display:flex;flex-direction:column;align-items:center;j
 .fi{opacity:0;transform:translateY(24px);transition:opacity .6s,transform .6s;}
 .fi.vis{opacity:1;transform:none;}
 
+/* GESTURE HINT */
+#gesture-hint {
+  position: fixed; top: 80px; left: 50%; transform: translate(-50%, -20px);
+  background: var(--nav-bg); backdrop-filter: blur(20px);
+  border: 1.5px solid var(--accent); padding: 14px 24px; border-radius: 16px;
+  display: flex; align-items: center; gap: 16px;
+  box-shadow: 0 10px 40px var(--glow); z-index: 10000;
+  opacity: 0; pointer-events: none; transition: opacity 0.5s, transform 0.5s;
+}
+#gesture-hint.show { opacity: 1; transform: translate(-50%, 0); }
+.gh-icon { font-size: 32px; }
+.gh-text { font-size: 13px; line-height: 1.5; color: var(--text2); }
+.gh-text strong { color: var(--text); font-size: 14px; display: block; margin-bottom: 4px; }
+
 @media(max-width:480px){
   section{padding:100px 16px 50px;}
   .hero-title .l1,.hero-title .l2{font-size:clamp(38px,12vw,60px);}
@@ -499,6 +513,16 @@ section{min-height:100vh;display:flex;flex-direction:column;align-items:center;j
   <div id="cam-lbl">📷 Hand gesture control</div>
 </div>
 
+<!-- GESTURE HINT -->
+<div id="gesture-hint">
+  <div class="gh-icon">✨</div>
+  <div class="gh-text">
+    <strong>Try these gestures!</strong>
+    ☝️ Point finger to draw trails<br>
+    🖐️ Open hand for fireworks
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous" defer></script>
@@ -831,6 +855,7 @@ const ctx=camCv.getContext('2d');
 let cameraOn=false;
 let mpCamera=null, mpHands=null;
 let smoothX=0.5, smoothY=0.5;
+let hintShown=false;
 
 function initMediaPipe() {
   mpHands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
@@ -860,6 +885,12 @@ function onResults(results) {
   ctx.drawImage(results.image, 0, 0, camCv.width, camCv.height);
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    if (!hintShown) {
+      hintShown = true;
+      const hint = document.getElementById('gesture-hint');
+      hint.classList.add('show');
+      setTimeout(() => hint.classList.remove('show'), 6000);
+    }
     camLbl.textContent = '✋ AI Tracking Active!';
     const landmarks = results.multiHandLandmarks[0];
     
@@ -927,6 +958,7 @@ camBtn.addEventListener('click', async () => {
     camLbl.textContent = '📷 Hand gesture control';
   } else {
     try {
+      hintShown = false;
       camWrap.style.display = 'block';
       camBtn.classList.add('active');
       cdot.classList.add('on');
