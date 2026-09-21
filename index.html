@@ -395,6 +395,24 @@ section{min-height:100vh;display:flex;flex-direction:column;align-items:center;j
     <button class="ptab" onclick="fp('ai',this)">AI / ML</button>
   </div>
   <div class="pgrid">
+    <div class="pcard fi" data-cat="ai">
+      <div class="pthumb pt1">👶</div>
+      <div class="pbody">
+        <h3>Neonatal Pain Assessment</h3>
+        <p>Deep learning system for real-time neonatal pain assessment using facial expressions and physiological signals for objective pain scoring.</p>
+        <div class="ptags"><span class="ptag">Python</span><span class="ptag">PyTorch</span><span class="ptag">Computer Vision</span><span class="ptag">CNN</span></div>
+        <div class="pft"><a href="https://github.com/ShreyanshMittal1921" target="_blank">↗ GitHub</a><span>👶</span></div>
+      </div>
+    </div>
+    <div class="pcard fi" data-cat="ai">
+      <div class="pthumb pt3">📊</div>
+      <div class="pbody">
+        <h3>Customer & Revenue Analytics Engine</h3>
+        <p>Advanced analytics engine for customer segmentation, churn prediction, and revenue forecasting with interactive data visualizations.</p>
+        <div class="ptags"><span class="ptag">Python</span><span class="ptag">Pandas</span><span class="ptag">Scikit-learn</span><span class="ptag">Data Science</span></div>
+        <div class="pft"><a href="https://github.com/ShreyanshMittal1921/customer_analytics" target="_blank">↗ GitHub</a><span>📊</span></div>
+      </div>
+    </div>
     <div class="pcard fi" data-cat="systems">
       <div class="pthumb pt1">🧠</div>
       <div class="pbody">
@@ -477,6 +495,9 @@ section{min-height:100vh;display:flex;flex-direction:column;align-items:center;j
   <div id="cam-lbl">📷 Hand gesture control</div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous" defer></script>
 <script>
 // ── CURSOR ─────────────────────────────────────────────────────
 const cur=document.getElementById('cur'),cur2=document.getElementById('cur2');
@@ -739,7 +760,7 @@ function fp(cat,btn){
 const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');});},{threshold:.08});
 document.querySelectorAll('.fi').forEach(el=>io.observe(el));
 
-// ── CAMERA HAND TRACKING ───────────────────────────────────────
+// ── CAMERA HAND TRACKING (AI Model) ────────────────────────────
 const camBtn=document.getElementById('cam-btn');
 const camWrap=document.getElementById('cam-wrap');
 const camVid=document.getElementById('cam-vid');
@@ -747,118 +768,91 @@ const camCv=document.getElementById('cam-cv');
 const camLbl=document.getElementById('cam-lbl');
 const cdot=document.getElementById('cdot');
 const ctx=camCv.getContext('2d');
-let stream=null,camOn=false,raf=null;
-let prevGray=null,smoothX=0.5,smoothY=0.5;
+let cameraOn=false;
+let mpCamera=null, mpHands=null;
+let smoothX=0.5, smoothY=0.5;
 
-camBtn.addEventListener('click',async()=>{
-  if(camOn){stopCam();return;}
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'},audio:false});
-    camVid.srcObject=stream;
-    await new Promise(r=>{camVid.onloadedmetadata=r;});
-    await camVid.play();
-    camWrap.style.display='block';
-    camBtn.classList.add('active');
-    cdot.classList.add('on');
-    camOn=true;
-    raf=requestAnimationFrame(frame);
-  }catch(e){
-    alert('Camera access denied. Please allow camera permission in your browser settings.');
+function initMediaPipe() {
+  mpHands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+  mpHands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
+  });
+  mpHands.onResults(onResults);
+
+  mpCamera = new Camera(camVid, {
+    onFrame: async () => {
+      if(cameraOn) await mpHands.send({image: camVid});
+    },
+    width: 320,
+    height: 240
+  });
+}
+
+function onResults(results) {
+  ctx.save();
+  ctx.clearRect(0,0,camCv.width,camCv.height);
+  // Mirror the canvas
+  ctx.translate(camCv.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(results.image, 0, 0, camCv.width, camCv.height);
+
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    camLbl.textContent = '✋ AI Tracking Active!';
+    const landmarks = results.multiHandLandmarks[0];
+    
+    // Draw futuristic skeleton
+    drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#22c55e', lineWidth: 2});
+    drawLandmarks(ctx, landmarks, {color: '#4D9FFF', lineWidth: 1, radius: 2});
+
+    // Target index finger tip (8) or palm (9)
+    const target = landmarks[9]; 
+    smoothX += (target.x - smoothX) * 0.25;
+    smoothY += (target.y - smoothY) * 0.25;
+
+    // Map to robot screen movement
+    tRX = (smoothX - 0.5) * 44;
+    tRY = (smoothY - 0.5) * 30;
+    
+    const ex = (smoothX - 0.5) * 5;
+    const ey = (smoothY - 0.5) * 5;
+    pL.setAttribute('cx', 82 + ex); pL.setAttribute('cy', 48 + ey);
+    pR.setAttribute('cx', 138 + ex); pR.setAttribute('cy', 48 + ey);
+  } else {
+    camLbl.textContent = '🤚 Show hand to camera';
+  }
+  ctx.restore();
+}
+
+camBtn.addEventListener('click', async () => {
+  if (cameraOn) {
+    cameraOn = false;
+    if (mpCamera) mpCamera.stop();
+    camWrap.style.display = 'none';
+    camBtn.classList.remove('active');
+    cdot.classList.remove('on');
+    ctx.clearRect(0, 0, camCv.width, camCv.height);
+    camLbl.textContent = '📷 Hand gesture control';
+  } else {
+    try {
+      camWrap.style.display = 'block';
+      camBtn.classList.add('active');
+      cdot.classList.add('on');
+      camLbl.textContent = 'Loading AI Model...';
+      cameraOn = true;
+      if (!mpHands) initMediaPipe();
+      await mpCamera.start();
+    } catch (e) {
+      alert('Camera access denied or error loading AI.');
+      cameraOn = false;
+      camWrap.style.display = 'none';
+      camBtn.classList.remove('active');
+      cdot.classList.remove('on');
+    }
   }
 });
-
-function stopCam(){
-  camOn=false;if(raf)cancelAnimationFrame(raf);
-  if(stream)stream.getTracks().forEach(t=>t.stop());
-  stream=null;prevGray=null;
-  camWrap.style.display='none';
-  camBtn.classList.remove('active');cdot.classList.remove('on');
-  ctx.clearRect(0,0,200,150);
-}
-
-// Offscreen canvas for processing
-const off=document.createElement('canvas');off.width=80;off.height=60;
-const octx=off.getContext('2d');
-
-function frame(){
-  if(!camOn)return;
-  // draw mirrored, downscaled
-  octx.save();octx.translate(80,0);octx.scale(-1,1);
-  octx.drawImage(camVid,0,0,80,60);
-  octx.restore();
-  const imgd=octx.getImageData(0,0,80,60).data;
-  const n=80*60;
-
-  // Build grayscale + skin mask
-  const gray=new Uint8Array(n);
-  let skinX=0,skinY=0,skinN=0;
-  for(let i=0;i<n;i++){
-    const r=imgd[i*4],g=imgd[i*4+1],b=imgd[i*4+2];
-    gray[i]=(r*77+g*150+b*29)>>8;
-    // Skin heuristic (works for various skin tones)
-    const max=Math.max(r,g,b),min=Math.min(r,g,b);
-    if(r>60&&g>30&&b>15&&r>g&&r>b&&(max-min)>15&&r<245){
-      skinX+=(i%80);skinY+=Math.floor(i/80);skinN++;
-    }
-  }
-
-  // Motion detection via frame diff
-  let motX=0,motY=0,motN=0;
-  if(prevGray){
-    for(let i=0;i<n;i++){
-      const d=Math.abs(gray[i]-prevGray[i]);
-      if(d>30){motX+=(i%80);motY+=Math.floor(i/80);motN++;}
-    }
-  }
-  prevGray=new Uint8Array(gray);
-
-  // Decide control source
-  let hx=smoothX,hy=smoothY,detected=false;
-  if(skinN>200){
-    hx=skinX/skinN/80;hy=skinY/skinN/60;
-    detected=true;
-    camLbl.textContent='✋ Hand detected!';
-  } else if(motN>150){
-    hx=motX/motN/80;hy=motY/motN/60;
-    detected=true;
-    camLbl.textContent='👋 Motion detected!';
-  } else {
-    camLbl.textContent='🤚 Show hand to camera';
-  }
-
-  // Smooth the position
-  smoothX+=(hx-smoothX)*.15;
-  smoothY+=(hy-smoothY)*.15;
-
-  if(detected){
-    // Map to screen robot movement
-    const sw=window.innerWidth,sh=window.innerHeight;
-    tRX=(smoothX-0.5)*44;
-    tRY=(smoothY-0.5)*30;
-    // Also update eyes
-    const ex=(smoothX-0.5)*5,ey=(smoothY-0.5)*5;
-    pL.setAttribute('cx',82+ex);pL.setAttribute('cy',48+ey);
-    pR.setAttribute('cx',138+ex);pR.setAttribute('cy',48+ey);
-  }
-
-  // Draw preview with detection overlay (mirrored to match user)
-  ctx.save();ctx.translate(200,0);ctx.scale(-1,1);
-  ctx.drawImage(off,0,0,200,150);
-  ctx.restore();
-  // Draw dot at hand position
-  if(detected){
-    ctx.beginPath();
-    ctx.arc(smoothX*200,smoothY*150,16,0,Math.PI*2);
-    ctx.strokeStyle='#22c55e';ctx.lineWidth=2.5;ctx.stroke();
-    ctx.fillStyle='rgba(34,197,94,.2)';ctx.fill();
-    // Crosshair
-    ctx.strokeStyle='rgba(34,197,94,.7)';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(smoothX*200-24,smoothY*150);ctx.lineTo(smoothX*200+24,smoothY*150);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(smoothX*200,smoothY*150-24);ctx.lineTo(smoothX*200,smoothY*150+24);ctx.stroke();
-  }
-
-  raf=requestAnimationFrame(frame);
-}
 </script>
 </body>
 </html>
